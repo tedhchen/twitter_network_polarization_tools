@@ -1,5 +1,16 @@
 # Preparation
 from tweet_polarization import *
+import pickle, os
+from matplotlib.backends.backend_pdf import PdfPages
+
+def attaching_communities(Gs_infos):
+
+	for i in range(len(Gs_infos)):
+		dict_attr = dict(zip(range(Gs_infos[i][0][0][1][2]), Gs_infos[i][0][0][3]))
+		#G = Gs_infos[i][0][0][0]
+		nx.set_node_attributes(Gs_infos[i][0][0][0], dict_attr, "group")
+
+	return(Gs_infos)
 
 # Importing parameters
 # Make sure to set the parameters in params.txt (i.e. search terms, file paths, etc.)
@@ -11,10 +22,10 @@ with open('params.txt', encoding = 'utf-8') as params:
 
 # Running script
 # 1) Parsing raw data
-run_parser(set1 = PARAMS['HASHTAGS'], set2 = None, all_text = True, raw = PARAMS['TWEET_FOLDER'][0], outfolder = PARAMS['DIRS'][0])
+#run_parser(set1 = PARAMS['HASHTAGS'], set2 = None, all_text = True, raw = PARAMS['TWEET_FOLDER'][0], outfolder = PARAMS['DIRS'][0])
 
 # 2) Create edgelists
-to_links(set1 = PARAMS['HASHTAGS'], set2 = None, infolder = PARAMS['DIRS'][0], outfolder = PARAMS['DIRS'][1], period_size = 85, period_interval = 1)
+#to_links(set1 = PARAMS['HASHTAGS'], set2 = None, infolder = PARAMS['DIRS'][0], outfolder = PARAMS['DIRS'][1], period_size = 85, period_interval = 1)
 
 # 3) Working with edgelist data
 Gs = []
@@ -25,9 +36,18 @@ for infile in sorted(os.listdir(bytes(PARAMS['DIRS'][1], encoding='utf-8'))):
 		print('Processing: ' + infile)
 		# Specify tasks and specifications here:
 		Gs.append([g_prep(filepath, strict = False, gc = True, cd = True, polarization = True, n_checks = 100, n_influential = 8, n_sim = 1000,
-						  func_name = 'sbm_search', col1 = "#7828a0FF", col2 = "#fcae91FF"), infile[:len(infile)-16]])
+						  func_name = 'none', col1 = "#7828a0FF", col2 = "#fcae91FF"), infile[:len(infile)-16]])
 		print('Done')
-# Gs[topic combo][0 (1 is name)][time period][0: graph; 1: [gc, node, edge]; 2: layout; 3: colours]
+
+# Gs[topic combo][0 (1 is name)][time period][0: graph; 1: [gc, node, edge]; 2: layout; 3: colours 4: rwc 5: aux]
+Gs_folder = "Gs_pickle_folder"
+try:
+	os.mkdir(Gs_folder)
+except FileExistsError:
+	pass
+
+updated_Gs = attaching_communities(Gs)
+pickle.dump(updated_Gs, open( "Gs_pickle_folder/Gs_pickle.p", "wb" ))
 
 # 3a) If need to check auxiliary information from community detection:
 #aux = []
@@ -36,7 +56,7 @@ for infile in sorted(os.listdir(bytes(PARAMS['DIRS'][1], encoding='utf-8'))):
 #		aux.append(g[5])
 
 # 4) Simple plotting
-plot_filename = ''
+plot_filename = 'all_plots.pdf'
 with PdfPages(plot_filename) as pdf:
 	for gs in Gs:
 		i = 0
@@ -62,7 +82,7 @@ with PdfPages(plot_filename) as pdf:
 # 5) Output a csv file with the following columns:
 # a) id, b) combination, c) period and interval, d) period id, e) text or hashtag, f) 1000 polarization scores, g) model
 import csv
-csv_filename = '.csv'
+csv_filename = 'network_statistics.csv'
 
 # Writing header
 header = ['gid', 'name', 'pid', 'type', 'n_nodes', 'n_edges', 'gcr']

@@ -3,14 +3,12 @@
 #---------------------------#
 import os, json, ast, pickle
 import networkx as nx
-from networkx.algorithms import community
 from collections import Counter
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-from cdlib import algorithms
 import random
-import graph_tool.all as gt
 import statistics
+import nxmetis
 
 #--------------------#
 # Defining functions #
@@ -206,12 +204,12 @@ def get_giant_component(G):
 	return GC, giant_component_ratio
 
 # Takes networkx graph (G) and converts it to graphtool graph (GT). Only considers undirected edges without further information.
-def simple_nx2gt(G):
-	GT = gt.Graph(directed = False)
-	es = list(G.edges())
-	for e in es:
-		GT.add_edge(e[0], e[1])
-	return GT
+# def simple_nx2gt(G):
+# 	GT = gt.Graph(directed = False)
+# 	es = list(G.edges())
+# 	for e in es:
+# 		GT.add_edge(e[0], e[1])
+# 	return GT
 
 # (4) Community detection algorithms. All these take networkx graph objects G.
 # Add additional community detection algorithms:
@@ -219,193 +217,206 @@ def simple_nx2gt(G):
 # Output should be nested list where index: 0) community 1 ids, 1) community 2 ids, 2) additional information if desired but not required
 # Specifically: [[Ids for comm1], [Ids for comm2], auxiliary information]
 
-# Girvan Newman
-def gn_comm2(G):
-	comm = community.girvan_newman(G)
-	comm = tuple(sorted(c) for c in next(comm))
-	return(comm)
+# # Girvan Newman
+# def gn_comm2(G):
+# 	comm = community.girvan_newman(G)
+# 	comm = tuple(sorted(c) for c in next(comm))
+# 	return(comm)
 
-# Fluid-C
-def af_comm2(G):
-	comm = algorithms.async_fluid(G, k = 2).communities
-	return(comm)
+# # Fluid-C
+# def af_comm2(G):
+# 	comm = algorithms.async_fluid(G, k = 2).communities
+# 	return(comm)
 
-# SBM (1-2)
-def sbm_lax_comm2(G):
-	GT = gt.Graph(directed = False)
-	es = list(G.edges())
-	for e in es:
-		GT.add_edge(e[0], e[1])
-	dc = True
-	curr_model = gt.minimize_blockmodel_dl(GT, B_min = 1, B_max = 2, deg_corr = True)
-	curr_desclen = curr_model.entropy()
-	for _ in range(9):
-		sbm = gt.minimize_blockmodel_dl(GT, B_min = 1, B_max = 2, deg_corr = True)
-		if sbm.entropy() < curr_desclen:
-			curr_model = sbm
-			curr_desclen = sbm.entropy()
-	for _ in range(10):
-		sbm = gt.minimize_blockmodel_dl(GT, B_min = 1, B_max = 2, deg_corr = False)
-		if sbm.entropy() < curr_desclen:
-			dc = False
-			curr_model = sbm
-			curr_desclen = sbm.entropy()
-	comm = curr_model.get_blocks()
-	comm1, comm2 = [], []
-	for v in GT.vertices():
-		if comm[v] == 0:
-			comm1.append(GT.vertex_index[v])
-		if comm[v] == 1:
-			comm2.append(GT.vertex_index[v])
-	return([comm1, comm2, dc])
+# # SBM (1-2)
+# def sbm_lax_comm2(G):
+# 	GT = gt.Graph(directed = False)
+# 	es = list(G.edges())
+# 	for e in es:
+# 		GT.add_edge(e[0], e[1])
+# 	dc = True
+# 	curr_model = gt.minimize_blockmodel_dl(GT, B_min = 1, B_max = 2, deg_corr = True)
+# 	curr_desclen = curr_model.entropy()
+# 	for _ in range(9):
+# 		sbm = gt.minimize_blockmodel_dl(GT, B_min = 1, B_max = 2, deg_corr = True)
+# 		if sbm.entropy() < curr_desclen:
+# 			curr_model = sbm
+# 			curr_desclen = sbm.entropy()
+# 	for _ in range(10):
+# 		sbm = gt.minimize_blockmodel_dl(GT, B_min = 1, B_max = 2, deg_corr = False)
+# 		if sbm.entropy() < curr_desclen:
+# 			dc = False
+# 			curr_model = sbm
+# 			curr_desclen = sbm.entropy()
+# 	comm = curr_model.get_blocks()
+# 	comm1, comm2 = [], []
+# 	for v in GT.vertices():
+# 		if comm[v] == 0:
+# 			comm1.append(GT.vertex_index[v])
+# 		if comm[v] == 1:
+# 			comm2.append(GT.vertex_index[v])
+# 	return([comm1, comm2, dc])
 
-# SBM (strict 2)
-def sbm_strict_comm2(G):
-	GT = gt.Graph(directed = False)
-	es = list(G.edges())
-	for e in es:
-		GT.add_edge(e[0], e[1])
-	dc = True
-	curr_model = gt.minimize_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = True)
-	curr_desclen = curr_model.entropy()
-	for _ in range(9):
-		sbm = gt.minimize_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = True)
-		if sbm.entropy() < curr_desclen:
-			curr_model = sbm
-			curr_desclen = sbm.entropy()
-	for _ in range(10):
-		sbm = gt.minimize_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = False)
-		if sbm.entropy() < curr_desclen:
-			dc = False
-			curr_model = sbm
-			curr_desclen = sbm.entropy()
-	comm = curr_model.get_blocks()
-	comm1, comm2 = [], []
-	for v in GT.vertices():
-		if comm[v] == 0:
-			comm1.append(GT.vertex_index[v])
-		if comm[v] == 1:
-			comm2.append(GT.vertex_index[v])
-	return([comm1, comm2, dc])
+# # SBM (strict 2)
+# def sbm_strict_comm2(G):
+# 	GT = gt.Graph(directed = False)
+# 	es = list(G.edges())
+# 	for e in es:
+# 		GT.add_edge(e[0], e[1])
+# 	dc = True
+# 	curr_model = gt.minimize_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = True)
+# 	curr_desclen = curr_model.entropy()
+# 	for _ in range(9):
+# 		sbm = gt.minimize_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = True)
+# 		if sbm.entropy() < curr_desclen:
+# 			curr_model = sbm
+# 			curr_desclen = sbm.entropy()
+# 	for _ in range(10):
+# 		sbm = gt.minimize_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = False)
+# 		if sbm.entropy() < curr_desclen:
+# 			dc = False
+# 			curr_model = sbm
+# 			curr_desclen = sbm.entropy()
+# 	comm = curr_model.get_blocks()
+# 	comm1, comm2 = [], []
+# 	for v in GT.vertices():
+# 		if comm[v] == 0:
+# 			comm1.append(GT.vertex_index[v])
+# 		if comm[v] == 1:
+# 			comm2.append(GT.vertex_index[v])
+# 	return([comm1, comm2, dc])
 
-# SBM-nested (1-2)
-def sbm_nested_lax_comm2(G):
-	GT = gt.Graph(directed = False)
-	es = list(G.edges())
-	for e in es:
-		GT.add_edge(e[0], e[1])
-	dc = True
-	curr_model = gt.minimize_nested_blockmodel_dl(GT, B_min = 1, B_max = 2, deg_corr = True)
-	curr_desclen = curr_model.entropy()
-	for _ in range(9):
-		sbm = gt.minimize_nested_blockmodel_dl(GT, B_min = 1, B_max = 2, deg_corr = True)
-		if sbm.entropy() < curr_desclen:
-			curr_model = sbm
-			curr_desclen = sbm.entropy()
-	for _ in range(10):
-		sbm = gt.minimize_nested_blockmodel_dl(GT, B_min = 1, B_max = 2, deg_corr = False)
-		if sbm.entropy() < curr_desclen:
-			dc = False
-			curr_model = sbm
-			curr_desclen = sbm.entropy()
+# # SBM-nested (1-2)
+# def sbm_nested_lax_comm2(G):
+# 	GT = gt.Graph(directed = False)
+# 	es = list(G.edges())
+# 	for e in es:
+# 		GT.add_edge(e[0], e[1])
+# 	dc = True
+# 	curr_model = gt.minimize_nested_blockmodel_dl(GT, B_min = 1, B_max = 2, deg_corr = True)
+# 	curr_desclen = curr_model.entropy()
+# 	for _ in range(9):
+# 		sbm = gt.minimize_nested_blockmodel_dl(GT, B_min = 1, B_max = 2, deg_corr = True)
+# 		if sbm.entropy() < curr_desclen:
+# 			curr_model = sbm
+# 			curr_desclen = sbm.entropy()
+# 	for _ in range(10):
+# 		sbm = gt.minimize_nested_blockmodel_dl(GT, B_min = 1, B_max = 2, deg_corr = False)
+# 		if sbm.entropy() < curr_desclen:
+# 			dc = False
+# 			curr_model = sbm
+# 			curr_desclen = sbm.entropy()
 
-	comm = curr_model.get_levels()[0].get_blocks()
-	comm1, comm2 = [], []
-	for v in GT.vertices():
-		if comm[v] == 0:
-			comm1.append(GT.vertex_index[v])
-		if comm[v] == 1:
-			comm2.append(GT.vertex_index[v])
-	return([comm1, comm2, dc])
+# 	comm = curr_model.get_levels()[0].get_blocks()
+# 	comm1, comm2 = [], []
+# 	for v in GT.vertices():
+# 		if comm[v] == 0:
+# 			comm1.append(GT.vertex_index[v])
+# 		if comm[v] == 1:
+# 			comm2.append(GT.vertex_index[v])
+# 	return([comm1, comm2, dc])
 
-# SBM-nested (strict 2)
-def sbm_nested_strict_comm2(G):
-	GT = gt.Graph(directed = False)
-	es = list(G.edges())
-	for e in es:
-		GT.add_edge(e[0], e[1])
-	dc = True
-	curr_model = gt.minimize_nested_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = True)
-	curr_desclen = curr_model.entropy()
-	for _ in range(9):
-		sbm = gt.minimize_nested_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = True)
-		if sbm.entropy() < curr_desclen:
-			curr_model = sbm
-			curr_desclen = sbm.entropy()
-	for _ in range(10):
-		sbm = gt.minimize_nested_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = False)
-		if sbm.entropy() < curr_desclen:
-			dc = False
-			curr_model = sbm
-			curr_desclen = sbm.entropy()
+# # SBM-nested (strict 2)
+# def sbm_nested_strict_comm2(G):
+# 	GT = gt.Graph(directed = False)
+# 	es = list(G.edges())
+# 	for e in es:
+# 		GT.add_edge(e[0], e[1])
+# 	dc = True
+# 	curr_model = gt.minimize_nested_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = True)
+# 	curr_desclen = curr_model.entropy()
+# 	for _ in range(9):
+# 		sbm = gt.minimize_nested_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = True)
+# 		if sbm.entropy() < curr_desclen:
+# 			curr_model = sbm
+# 			curr_desclen = sbm.entropy()
+# 	for _ in range(10):
+# 		sbm = gt.minimize_nested_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = False)
+# 		if sbm.entropy() < curr_desclen:
+# 			dc = False
+# 			curr_model = sbm
+# 			curr_desclen = sbm.entropy()
 
-	comm = curr_model.get_levels()[0].get_blocks()
-	comm1, comm2 = [], []
-	for v in GT.vertices():
-		if comm[v] == 0:
-			comm1.append(GT.vertex_index[v])
-		if comm[v] == 1:
-			comm2.append(GT.vertex_index[v])
-	return([comm1, comm2, dc])
+# 	comm = curr_model.get_levels()[0].get_blocks()
+# 	comm1, comm2 = [], []
+# 	for v in GT.vertices():
+# 		if comm[v] == 0:
+# 			comm1.append(GT.vertex_index[v])
+# 		if comm[v] == 1:
+# 			comm2.append(GT.vertex_index[v])
+# 	return([comm1, comm2, dc])
 
-# SBM search
-def sbm_search(G):
-	GT = simple_nx2gt(G)
-	nested = False
+# # SBM search
+# def sbm_search(G):
+# 	GT = simple_nx2gt(G)
+# 	nested = False
 	
-	# Find SBM with lowest description length: curr_m
-	curr_m = gt.minimize_blockmodel_dl(GT, B_min = 1, B_max = 2, deg_corr = True)
-	curr_dl = curr_m.entropy()
-	for _ in range(4):
-		m = gt.minimize_blockmodel_dl(GT, B_min = 1, B_max = 2, deg_corr = True)
-		if m.entropy() < curr_dl:
-			curr_m = m
-			curr_dl = m.entropy()
+# 	# Find SBM with lowest description length: curr_m
+# 	curr_m = gt.minimize_blockmodel_dl(GT, B_min = 1, B_max = 2, deg_corr = True)
+# 	curr_dl = curr_m.entropy()
+# 	for _ in range(4):
+# 		m = gt.minimize_blockmodel_dl(GT, B_min = 1, B_max = 2, deg_corr = True)
+# 		if m.entropy() < curr_dl:
+# 			curr_m = m
+# 			curr_dl = m.entropy()
 			
-	# Find nested SBM that:
-	# 1) splits into two blocks
-	# 2) aggregated blocks performs better than curr_m
-	# 3) best of ten fitted models
-	for _ in range(5):
-		m = gt.minimize_nested_blockmodel_dl(GT, B_min = 1, B_max = 4, deg_corr = True)
-		m_levels = m.get_levels()
-		for i in range(len(m_levels)):
-			if m_levels[i].get_B() == 2:
-				if m.entropy() < curr_dl:
-					m = m.project_level(i)
-					curr_m = m
-					curr_dl = m.entropy()
-					nested = True
-				break
+# 	# Find nested SBM that:
+# 	# 1) splits into two blocks
+# 	# 2) aggregated blocks performs better than curr_m
+# 	# 3) best of ten fitted models
+# 	for _ in range(5):
+# 		m = gt.minimize_nested_blockmodel_dl(GT, B_min = 1, B_max = 4, deg_corr = True)
+# 		m_levels = m.get_levels()
+# 		for i in range(len(m_levels)):
+# 			if m_levels[i].get_B() == 2:
+# 				if m.entropy() < curr_dl:
+# 					m = m.project_level(i)
+# 					curr_m = m
+# 					curr_dl = m.entropy()
+# 					nested = True
+# 				break
 	
-	# Getting communities
-	comm = curr_m.get_blocks()
-	comm1, comm2 = [], []
-	for v in GT.vertices():
-		if comm[v] == 0:
-			comm1.append(GT.vertex_index[v])
-		if comm[v] == 1:
-			comm2.append(GT.vertex_index[v])
-	return([comm1, comm2, nested])
+# 	# Getting communities
+# 	comm = curr_m.get_blocks()
+# 	comm1, comm2 = [], []
+# 	for v in GT.vertices():
+# 		if comm[v] == 0:
+# 			comm1.append(GT.vertex_index[v])
+# 		if comm[v] == 1:
+# 			comm2.append(GT.vertex_index[v])
+# 	return([comm1, comm2, nested])
 
-# Infomap
-def infomap_comm(G):
-	comm = algorithms.infomap(G).communities
-	return(comm)
+# # Infomap
+# def infomap_comm(G):
+# 	comm = algorithms.infomap(G).communities
+# 	return(comm)
 
-# Eigenvector
-def eigenvector_comm(G):
-	comm = algorithms.eigenvector(G).communities
-	return(comm)
+# # Eigenvector
+# def eigenvector_comm(G):
+# 	comm = algorithms.eigenvector(G).communities
+# 	return(comm)
 
-# Louvian
-def louvain_comm(G):
-	comm = algorithms.louvain(G).communities
-	return(comm)
+# # Louvian
+# def louvain_comm(G):
+# 	comm = algorithms.louvain(G).communities
+# 	return(comm)
 
-# EM
-def em_comm2(G):
-	comm = algorithms.em(G, k = 2).communities
+# # EM
+# def em_comm2(G):
+# 	comm = algorithms.em(G, k = 2).communities
+# 	return(comm)
+
+# Metis
+def metis_partition(G):
+	
+	# For further details on metis-parameters, please refer to the manual
+	settings = nxmetis.MetisOptions(ncuts=4, niter=200, ufactor=280)
+	par = nxmetis.partition(G, 2, options=settings)
+	the_edge_cut = par[0]
+	community1 = par[1][0]
+	community2 = par[1][1]
+	comm = [community1, community2, the_edge_cut]
+
 	return(comm)
 
 
@@ -513,23 +524,28 @@ def randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_us
 ## func_name: specify the community detection algorithm to use (see below for key)
 ## n_checks, n_influential, n_sim: used by randomwalk_polarization()
 def comm_detect(G, col1, col2, func_name, polarization, n_checks, n_influential, n_sim):
-	functions = {'girvan_newman': gn_comm2, 'async_fluid': af_comm2, 'louvain': louvain_comm,
-				 'infomap': infomap_comm, 'eigenvector': eigenvector_comm, 'em': em_comm2,
-				 'sbm_lax': sbm_lax_comm2, 'sbm_strict': sbm_strict_comm2, 'sbm_search': sbm_search,
-				 'sbm_nested_lax': sbm_nested_lax_comm2, 'sbm_nested_strict': sbm_nested_strict_comm2}
-	if func_name in functions:
-		comm = functions[func_name](G)
-	if len(comm) == 3:
-		aux = comm[2]
+	# functions = {'girvan_newman': gn_comm2, 'async_fluid': af_comm2, 'louvain': louvain_comm,
+	# 			 'infomap': infomap_comm, 'eigenvector': eigenvector_comm, 'em': em_comm2,
+	# 			 'sbm_lax': sbm_lax_comm2, 'sbm_strict': sbm_strict_comm2, 'sbm_search': sbm_search,
+	# 			 'sbm_nested_lax': sbm_nested_lax_comm2, 'sbm_nested_strict': sbm_nested_strict_comm2}
+	# if func_name in functions:
+	# 	comm = functions[func_name](G)
+	# if len(comm) == 3:
+	# 	aux = comm[2]
+	# else:
+	# 	aux = 'NA"'
+	# if len(comm[1]) == 0:
+	# 	rwc = -1
+	# else:
+
+	comm = metis_partition(G)
+	aux = comm[2]
+
+	if polarization == True:
+		rwc = randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_users = comm[0], right_partition_users = comm[1])
 	else:
-		aux = 'NA"'
-	if len(comm[1]) == 0:
-		rwc = -1
-	else:
-		if polarization == True:
-			rwc = randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_users = comm[0], right_partition_users = comm[1])
-		else:
-			rwc = 0
+		rwc = 0
+
 	cols = []
 	for node in list(G.nodes):
 		if node in comm[0]:
