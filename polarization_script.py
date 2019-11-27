@@ -8,6 +8,8 @@ with open('params.txt', encoding = 'utf-8') as params:
 	for line in params:
 		param, value = line.strip().split(':', 1)
 		PARAMS[param] = value.split(';')
+		if PARAMS[param] == ['']:
+			PARAMS[param] = None
 
 # Running script
 # 1) Parsing raw data
