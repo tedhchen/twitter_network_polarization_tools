@@ -203,20 +203,220 @@ def get_giant_component(G):
 	giant_component_ratio = GC.number_of_nodes()/G.number_of_nodes()
 	return GC, giant_component_ratio
 
-# Takes networkx graph (G) and converts it to graphtool graph (GT). Only considers undirected edges without further information.
-# def simple_nx2gt(G):
-# 	GT = gt.Graph(directed = False)
-# 	es = list(G.edges())
-# 	for e in es:
-# 		GT.add_edge(e[0], e[1])
-# 	return GT
-
 # (4) Community detection algorithms. All these take networkx graph objects G.
 # Add additional community detection algorithms:
 # Input is always networkx graph object G, so add package converter in the beginning of the function if needed;
 # Output should be nested list where index: 0) community 1 ids, 1) community 2 ids, 2) additional information if desired but not required
 # Specifically: [[Ids for comm1], [Ids for comm2], auxiliary information]
 
+# Metis
+def metis_partition(G):
+	
+	# For further details on metis-parameters, please refer to the manual
+	settings = nxmetis.MetisOptions(ncuts=4, niter=200, ufactor=280)
+	par = nxmetis.partition(G, 2, options=settings)
+	the_edge_cut = par[0]
+	community1 = par[1][0]
+	community2 = par[1][1]
+	comm = [community1, community2, the_edge_cut]
+
+	return(comm)
+
+
+# (5) perform_randomwalk() and randomwalk_polarization() are used to estimate the random walk controversy for networks built from the pickle edgelists above.
+
+# Performs a random walk terminating when an influential node (supplied) is reached;
+# Returns the side that the walk ended on.
+# Arguments:
+## G: networkx graph object
+## starting_node: the node to start the walk from
+## li and ri: lists of influences from the left and right partitions, respectively
+def perform_randomwalk(G, starting_node, li, ri):
+	found = 0
+	end_side = 0
+	which_random_starting_node = starting_node
+   
+	while (found != 1):
+		neighbors = list(G.neighbors(which_random_starting_node))
+		next_node = random.choice(neighbors)
+		if (next_node in li):
+			end_side = "left"
+			found = 1  
+		elif (next_node in ri):
+			end_side = "right"
+			found = 1
+		else:
+			which_random_starting_node = next_node       
+	return end_side
+
+# Takes random walk controversy algorithm's specifications and estimates the controversy score for the supplied graph;
+# Returns the random walk controvesy score over a specified number (n_sim) of draws;
+# Arguments:
+## G: networkx graph object
+## n_checks: number of nodes in the random sample of nodes
+## n_influential: number of influential nodes from each side
+## n_sim: number of times to let the n_checks nodes walk
+## left_ and right_partition_users: lists of nodes belonging to each respective community
+def randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_users, right_partition_users):	
+	dict_degree = {}
+	for node in G.nodes():
+		dict_degree[node] = G.degree(node)
+	sorted_dict_degree = sorted(dict_degree.items(), key = lambda kv: kv[1], reverse = True)
+	left_influencers, right_influencers = [], []
+	count_left, count_right = 0, 0
+	for node in sorted_dict_degree:
+		if (node[0] in left_partition_users):
+			if (count_left < n_influential):
+				left_influencers.append(node[0])
+				count_left += 1
+		else:
+			if (count_right < n_influential):
+				right_influencers.append(node[0])
+				count_right += 1
+	rwc = []
+	samp = random.choices(list(G.nodes()), k = n_checks)
+	for _ in range(n_sim):
+		left_left = 0
+		left_right = 0
+		right_right = 0
+		right_left = 0
+
+		for node in samp:
+			if node in left_partition_users:
+				starting_side = 'left'
+			else:
+				starting_side = 'right'
+			end_side = perform_randomwalk(G, node, left_influencers, right_influencers)
+			if (starting_side == "left") and (end_side ==  "left"):
+				left_left += 1
+			elif (starting_side == "left") and (end_side ==  "right"):
+				left_right += 1
+			elif (starting_side == "right") and (end_side ==  "right"):
+				right_right += 1
+			elif (starting_side == "right") and (end_side ==  "left"):
+				right_left += 1
+			else:
+				print("Oops!")
+		try:
+			pll = (left_left)/(left_left+right_left)
+		except ZeroDivisionError:
+			pll = 1
+		try:
+			plr = (left_right)/(left_right+right_right)
+		except ZeroDivisionError:
+			plr = 1
+		try:
+			prl = (right_left)/(left_left+right_left)
+		except ZeroDivisionError:
+			prl = 1
+		try:
+			prr = (right_right)/(left_right+right_right)
+		except ZeroDivisionError:
+			prr = 1
+		rwc.append(pll*prr - plr*prl)
+	return(rwc)
+
+# (6) comm_detect() and g_prep() are high level wrappers to perform the partitioning and polarization estimation procedures
+
+# Community Detection Wrapper
+# Takes a networkx graph object G, specifications, and returns:
+# a) a list of community membership by node, b) the random walk controversy score, and c) auxiliary information returned by some comm detect algorithms
+# Arguments:
+## G: networkx graph object
+## col1 and col2: ids for the two communities; best specified as colours to facilitate easy plotting
+## func_name: specify the community detection algorithm to use (see below for key)
+## n_checks, n_influential, n_sim: used by randomwalk_polarization()
+def comm_detect(G, col1, col2, func_name, polarization, n_checks, n_influential, n_sim):
+	# functions = {'girvan_newman': gn_comm2, 'async_fluid': af_comm2, 'louvain': louvain_comm,
+	# 			 'infomap': infomap_comm, 'eigenvector': eigenvector_comm, 'em': em_comm2,
+	# 			 'sbm_lax': sbm_lax_comm2, 'sbm_strict': sbm_strict_comm2, 'sbm_search': sbm_search,
+	# 			 'sbm_nested_lax': sbm_nested_lax_comm2, 'sbm_nested_strict': sbm_nested_strict_comm2}
+	# if func_name in functions:
+	# 	comm = functions[func_name](G)
+	# if len(comm) == 3:
+	# 	aux = comm[2]
+	# else:
+	# 	aux = 'NA"'
+	# if len(comm[1]) == 0:
+	# 	rwc = -1
+	# else:
+
+	comm = metis_partition(G)
+	aux = comm[2]
+
+	if polarization == True:
+		rwc = randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_users = comm[0], right_partition_users = comm[1])
+	else:
+		rwc = 0
+
+	cols = []
+	for node in list(G.nodes):
+		if node in comm[0]:
+			cols.append(col1)
+		elif node in comm[1]:
+			cols.append(col2)
+		else:
+			cols.append('#696969')
+	return cols, rwc, aux
+
+
+# High level wrapper to process the pickle edgelists. Has specification to include/omit various subtasks.
+# Returns a nested list of graphs, communities, and other information.
+# The returned object: Gs[topic combination][0 (1 is name)][time period][0: graph; 1: [gcr, node, edge]; 2: layout; 3: colours, 4: rwc, 5: aux]
+# Can be keyboard interrupted and keep current results
+# Arguments:
+## infile: name of pickle file
+## strict: whether retweets only count if the original tweet had both set1 and set2 topics (probably best to use False)
+## gc: whether to subset to giant component
+## cd: whether to run community detection (False is useful to visualize faster)
+## polarization: whether to estimate random walk controversy score
+## n_checks, n_influential, n_sim: specification for the random walk score (see randomwalk_polarization())
+## func_name: the community detection algorithm to use
+## col1 and col2: ids (best to be plottable colors) for community membership
+def g_prep(infile, strict, gc, cd, polarization, plot_layout, n_checks, n_influential, n_sim, func_name, col1, col2):
+	with open(infile.encode('utf-8'), 'rb') as in_pickle:
+		rt_list = pickle.load(in_pickle)
+	if strict:
+		rt_list = [x[1] for x in rt_list]
+	else:
+		rt_list = [x[0] for x in rt_list]
+	
+	Gs = []
+	i = 0
+	try:
+		for period in rt_list:
+			i += 1
+			print('\tPeriod ' + str(i) + '...')
+			G = nx.Graph()
+			G.add_edges_from(period)
+			if G.number_of_nodes() < 2:
+				gc, cd = False, False
+			if gc == True:
+				G, GCR = get_giant_component(G)
+			else:
+				GCR = 1
+			G = nx.convert_node_labels_to_integers(G, first_label = 0, ordering = 'default', label_attribute = 'handle')
+			if plot_layout == True:
+				node_layout = nx.spring_layout(G)
+			else:
+				node_layout = 0
+			if cd == True:
+				cols, rwc, aux = comm_detect(G, col1, col2, func_name, polarization, n_checks, n_influential, n_sim)
+			else:
+				cols, rwc, aux = col1, 0, 'NA'
+			
+			dict_attr = dict(zip(range(G.number_of_nodes()), cols))
+			nx.set_node_attributes(G, dict_attr, "group")
+			
+			Gs.append([G, [GCR, G.number_of_nodes(), G.number_of_edges()], node_layout, cols, rwc, aux])
+	except KeyboardInterrupt:
+		print('Manually stopped.')
+		return Gs
+	return Gs
+
+#------------#
+# Not in use #
+#------------#
 # # Girvan Newman
 # def gn_comm2(G):
 # 	comm = community.girvan_newman(G)
@@ -406,200 +606,21 @@ def get_giant_component(G):
 # 	comm = algorithms.em(G, k = 2).communities
 # 	return(comm)
 
-# Metis
-def metis_partition(G):
-	
-	# For further details on metis-parameters, please refer to the manual
-	settings = nxmetis.MetisOptions(ncuts=4, niter=200, ufactor=280)
-	par = nxmetis.partition(G, 2, options=settings)
-	the_edge_cut = par[0]
-	community1 = par[1][0]
-	community2 = par[1][1]
-	comm = [community1, community2, the_edge_cut]
+# Takes networkx graph (G) and converts it to graphtool graph (GT). Only considers undirected edges without further information.
+# def simple_nx2gt(G):
+# 	GT = gt.Graph(directed = False)
+# 	es = list(G.edges())
+# 	for e in es:
+# 		GT.add_edge(e[0], e[1])
+# 	return GT
 
-	return(comm)
-
-
-# (5) perform_randomwalk() and randomwalk_polarization() are used to estimate the random walk controversy for networks built from the pickle edgelists above.
-
-# Performs a random walk terminating when an influential node (supplied) is reached;
-# Returns the side that the walk ended on.
-# Arguments:
-## G: networkx graph object
-## starting_node: the node to start the walk from
-## li and ri: lists of influences from the left and right partitions, respectively
-def perform_randomwalk(G, starting_node, li, ri):
-	found = 0
-	end_side = 0
-	which_random_starting_node = starting_node
-   
-	while (found != 1):
-		neighbors = list(G.neighbors(which_random_starting_node))
-		next_node = random.choice(neighbors)
-		if (next_node in li):
-			end_side = "left"
-			found = 1  
-		elif (next_node in ri):
-			end_side = "right"
-			found = 1
-		else:
-			which_random_starting_node = next_node       
-	return end_side
-
-# Takes random walk controversy algorithm's specifications and estimates the controversy score for the supplied graph;
-# Returns the random walk controvesy score over a specified number (n_sim) of draws;
-# Arguments:
-## G: networkx graph object
-## n_checks: number of nodes in the random sample of nodes
-## n_influential: number of influential nodes from each side
-## n_sim: number of times to let the n_checks nodes walk
-## left_ and right_partition_users: lists of nodes belonging to each respective community
-def randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_users, right_partition_users):	
-	dict_degree = {}
-	for node in G.nodes():
-		dict_degree[node] = G.degree(node)
-	sorted_dict_degree = sorted(dict_degree.items(), key = lambda kv: kv[1], reverse = True)
-	left_influencers, right_influencers = [], []
-	count_left, count_right = 0, 0
-	for node in sorted_dict_degree:
-		if (node[0] in left_partition_users):
-			if (count_left < n_influential):
-				left_influencers.append(node[0])
-				count_left += 1
-		else:
-			if (count_right < n_influential):
-				right_influencers.append(node[0])
-				count_right += 1
-	rwc = []
-	samp = random.choices(list(G.nodes()), k = n_checks)
-	for _ in range(n_sim):
-		left_left = 0
-		left_right = 0
-		right_right = 0
-		right_left = 0
-
-		for node in samp:
-			if node in left_partition_users:
-				starting_side = 'left'
-			else:
-				starting_side = 'right'
-			end_side = perform_randomwalk(G, node, left_influencers, right_influencers)
-			if (starting_side == "left") and (end_side ==  "left"):
-				left_left += 1
-			elif (starting_side == "left") and (end_side ==  "right"):
-				left_right += 1
-			elif (starting_side == "right") and (end_side ==  "right"):
-				right_right += 1
-			elif (starting_side == "right") and (end_side ==  "left"):
-				right_left += 1
-			else:
-				print("Oops!")
-		try:
-			pll = (left_left)/(left_left+right_left)
-		except ZeroDivisionError:
-			pll = 1
-		try:
-			plr = (left_right)/(left_right+right_right)
-		except ZeroDivisionError:
-			plr = 1
-		try:
-			prl = (right_left)/(left_left+right_left)
-		except ZeroDivisionError:
-			prl = 1
-		try:
-			prr = (right_right)/(left_right+right_right)
-		except ZeroDivisionError:
-			prr = 1
-		rwc.append(pll*prr - plr*prl)
-	return(rwc)
-
-# (6) comm_detect() and g_prep() are high level wrappers to perform the partitioning and polarization estimation procedures
-
-# Community Detection Wrapper
-# Takes a networkx graph object G, specifications, and returns:
-# a) a list of community membership by node, b) the random walk controversy score, and c) auxiliary information returned by some comm detect algorithms
-# Arguments:
-## G: networkx graph object
-## col1 and col2: ids for the two communities; best specified as colours to facilitate easy plotting
-## func_name: specify the community detection algorithm to use (see below for key)
-## n_checks, n_influential, n_sim: used by randomwalk_polarization()
-def comm_detect(G, col1, col2, func_name, polarization, n_checks, n_influential, n_sim):
-	# functions = {'girvan_newman': gn_comm2, 'async_fluid': af_comm2, 'louvain': louvain_comm,
-	# 			 'infomap': infomap_comm, 'eigenvector': eigenvector_comm, 'em': em_comm2,
-	# 			 'sbm_lax': sbm_lax_comm2, 'sbm_strict': sbm_strict_comm2, 'sbm_search': sbm_search,
-	# 			 'sbm_nested_lax': sbm_nested_lax_comm2, 'sbm_nested_strict': sbm_nested_strict_comm2}
-	# if func_name in functions:
-	# 	comm = functions[func_name](G)
-	# if len(comm) == 3:
-	# 	aux = comm[2]
-	# else:
-	# 	aux = 'NA"'
-	# if len(comm[1]) == 0:
-	# 	rwc = -1
-	# else:
-
-	comm = metis_partition(G)
-	aux = comm[2]
-
-	if polarization == True:
-		rwc = randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_users = comm[0], right_partition_users = comm[1])
-	else:
-		rwc = 0
-
-	cols = []
-	for node in list(G.nodes):
-		if node in comm[0]:
-			cols.append(col1)
-		elif node in comm[1]:
-			cols.append(col2)
-		else:
-			cols.append('#696969')
-	return cols, rwc, aux
-
-
-# High level wrapper to process the pickle edgelists. Has specification to include/omit various subtasks.
-# Returns a nested list of graphs, communities, and other information.
-# The returned object: Gs[topic combination][0 (1 is name)][time period][0: graph; 1: [gcr, node, edge]; 2: layout; 3: colours, 4: rwc, 5: aux]
-# Can be keyboard interrupted and keep current results
-# Arguments:
-## infile: name of pickle file
-## strict: whether retweets only count if the original tweet had both set1 and set2 topics (probably best to use False)
-## gc: whether to subset to giant component
-## cd: whether to run community detection (False is useful to visualize faster)
-## polarization: whether to estimate random walk controversy score
-## n_checks, n_influential, n_sim: specification for the random walk score (see randomwalk_polarization())
-## func_name: the community detection algorithm to use
-## col1 and col2: ids (best to be plottable colors) for community membership
-def g_prep(infile, strict, gc, cd, polarization, n_checks, n_influential, n_sim, func_name, col1, col2):
-	with open(infile.encode('utf-8'), 'rb') as in_pickle:
-		rt_list = pickle.load(in_pickle)
-	if strict:
-		rt_list = [x[1] for x in rt_list]
-	else:
-		rt_list = [x[0] for x in rt_list]
-	
-	Gs = []
-	i = 0
-	try:
-		for period in rt_list:
-			i += 1
-			print('\tPeriod ' + str(i) + '...')
-			G = nx.Graph()
-			G.add_edges_from(period)
-			if G.number_of_nodes() < 2:
-				gc, cd = False, False
-			if gc == True:
-				G, GCR = get_giant_component(G)
-			else:
-				GCR = 1
-			G = nx.convert_node_labels_to_integers(G, first_label = 0, ordering = 'default', label_attribute = 'handle')
-			node_layout = nx.spring_layout(G)
-			if cd == True:
-				cols, rwc, aux = comm_detect(G, col1, col2, func_name, polarization, n_checks, n_influential, n_sim)
-			else:
-				cols, rwc, aux = col1, 0, 'NA'
-			Gs.append([G, [GCR, G.number_of_nodes(), G.number_of_edges()], node_layout, cols, rwc, aux])
-	except KeyboardInterrupt:
-		print('Manually stopped.')
-		return Gs
-	return Gs
+# Take community information and add it as a node attribute to networkx graph object.
+# def attaching_communities(Gs_infos):
+# 
+# 	for i in range(len(Gs_infos)):
+# 		for j in range(len(Gs_infos[i][0])):
+# 			dict_attr = dict(zip(range(Gs_infos[i][0][0][1][2]), Gs_infos[i][0][0][3]))
+# 			#G = Gs_infos[i][0][0][0]
+# 			nx.set_node_attributes(Gs_infos[i][0][0][0], dict_attr, "group")
+# 
+# 	return(Gs_infos)
