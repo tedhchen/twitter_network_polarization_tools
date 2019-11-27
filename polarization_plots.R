@@ -1,3 +1,4 @@
+# This file provides an example of using the .csv file output from polarization_script.py to make temporal plots. It will not work as is.
 # Preparation
 setwd('')
 
