@@ -13,10 +13,10 @@ with open('params.txt', encoding = 'utf-8') as params:
 
 # Running script
 # 1) Parsing raw data
-run_parser(set1 = PARAMS['SET1'], set2 = None, all_text = True, raw = PARAMS['TWEET_FOLDER'][0], outfolder = PARAMS['OUTPUT'][0])
+run_parser(set1 = PARAMS['SET1'], set2 = PARAMS['SET2'], all_text = True, raw = PARAMS['TWEET_FOLDER'][0], outfolder = PARAMS['OUTPUT'][0])
 
 # 2) Create edgelists
-to_links(set1 = PARAMS['SET1'], set2 = None, infolder = PARAMS['OUTPUT'][0], outfolder = PARAMS['OUTPUT'][1], period_size = 85, period_interval = 1)
+to_links(set1 = PARAMS['SET1'], set2 = PARAMS['SET2'], infolder = PARAMS['OUTPUT'][0], outfolder = PARAMS['OUTPUT'][1], period_size = PARAMS['TIME'][0], period_interval = PARAMS['TIME'][1])
 
 # 3) Working with edgelist data
 Gs = []
@@ -28,7 +28,7 @@ for infile in sorted(os.listdir(bytes(PARAMS['OUTPUT'][1], encoding='utf-8'))):
 		# Specify tasks and specifications here:
 		Gs.append([g_prep(filepath, strict = False, func_name = 'none', 
 				  gc = True, cd = True, polarization = True, plot_layout = False, # Tasks 
-				  n_checks = 100, n_influential = 8, n_sim = 1000,                # RWC options
+				  n_checks = 1000, n_influential = 8, n_sim = 1000,                # RWC options
 				  col1 = "#7828a0FF", col2 = "#fcae91FF"),                        # Community labels
 			   infile[:len(infile)-16]])
 		
