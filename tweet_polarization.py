@@ -150,6 +150,8 @@ def to_links(set1, set2, infolder, outfolder, period_size, period_interval):
 		os.mkdir(outfolder)
 	except FileExistsError:
 		pass
+	period_size = int(period_size)
+	period_interval = int(period_interval)
 	for a in set1:
 		if set2 == None:
 			period_rts = []
