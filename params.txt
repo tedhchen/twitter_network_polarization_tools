@@ -1,7 +1,8 @@
 TWEET_FOLDER:/m/cs/scratch/networks/ecanet/elections/raw_tweets/finnish_election
 OUTPUT:has_topic;topic_edgelists;graphlist;polarization_statistics
+TIME:85;1
 SET1:vaalit2019;sote;ilmastonmuutos;eduskuntavaalit2019;politiikka;ilmastovaalit;kokoomus;vaalit;ilmastolakko;työelämä;koulutus;eduskuntavaalit;ilmasto;vihreät;viestintä;turpo;vaalitentti;nuoret;tasaarvo;keskusta;nytonpakko;turku;maahanmuutto;vaalit19;talous;suomi;tutkimus;hallitus;hyvinvointi;perussuomalaiset;luonto;lapset;liikenne;digitalisaatio;poliisi;yrittäjät;terveys;vasemmisto;mielenterveys;vanhustenhoito;eduskunta;helsinki;työllisyys;turvallisuus;osaaminen;jotainrajaa;ihmisoikeudet;sdp;korvaamaton;tulevaisuus;journalismi;samasuunta;johtaminen;siksitiede;yrittäjyys;työ;ympäristö;yle;osallisuus;metsä;koulutusratkaisee;maakuntauudistus;ammatillinenkoulutus;kasvu;demokratia;rasismi;persut;yhdenvertaisuus;vihapuhe;perustulo;näytäluontosi;koulutustaprkl;vaalikone;piraatit;kunnat;eu;verotus;ilmastomarssi;aktiivimalli;lapsenoikeudet;yleastudio;monimuotoisuus;tampere;rekry;oulu;hoitajamitoitus;tulevaisuuslinja;köyhyys;perustuslaki;sananvapaus;sinäpäätät;sosiaaliturva;arvot;tiedevaalit;tiede;eriarvoisuus;yliopisto;maksuton2aste;fridaysforfuture;finland
-SET2:NONE
+SET2:
 PARTIES:kokoomus;vihreät;keskusta;perussuomalaiset,persut,siksips;vasemmisto,siksivasemmisto;sdp,demarit
 CLIMATES:CLIMATE,ilmasto,ilmastolakko,ilmastomarssi,ilmastonmuutos,ilmastovaalit,fridaysforfuture,nytonpakko
 PARTISAN:PARTIES,kokoomus,vihreät,keskusta,perussuomalaiset,persut,siksips,vasemmisto,siksivasemmisto,sdp,demarit
