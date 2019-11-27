@@ -1,16 +1,5 @@
 # Preparation
 from tweet_polarization import *
-import pickle, os
-from matplotlib.backends.backend_pdf import PdfPages
-
-def attaching_communities(Gs_infos):
-
-	for i in range(len(Gs_infos)):
-		dict_attr = dict(zip(range(Gs_infos[i][0][0][1][2]), Gs_infos[i][0][0][3]))
-		#G = Gs_infos[i][0][0][0]
-		nx.set_node_attributes(Gs_infos[i][0][0][0], dict_attr, "group")
-
-	return(Gs_infos)
 
 # Importing parameters
 # Make sure to set the parameters in params.txt (i.e. search terms, file paths, etc.)
@@ -22,67 +11,63 @@ with open('params.txt', encoding = 'utf-8') as params:
 
 # Running script
 # 1) Parsing raw data
-#run_parser(set1 = PARAMS['HASHTAGS'], set2 = None, all_text = True, raw = PARAMS['TWEET_FOLDER'][0], outfolder = PARAMS['DIRS'][0])
+run_parser(set1 = PARAMS['SET1'], set2 = None, all_text = True, raw = PARAMS['TWEET_FOLDER'][0], outfolder = PARAMS['OUTPUT'][0])
 
 # 2) Create edgelists
-#to_links(set1 = PARAMS['HASHTAGS'], set2 = None, infolder = PARAMS['DIRS'][0], outfolder = PARAMS['DIRS'][1], period_size = 85, period_interval = 1)
+to_links(set1 = PARAMS['SET1'], set2 = None, infolder = PARAMS['OUTPUT'][0], outfolder = PARAMS['OUTPUT'][1], period_size = 85, period_interval = 1)
 
 # 3) Working with edgelist data
 Gs = []
-for infile in sorted(os.listdir(bytes(PARAMS['DIRS'][1], encoding='utf-8'))):
+for infile in sorted(os.listdir(bytes(PARAMS['OUTPUT'][1], encoding='utf-8'))):
 	infile = infile.decode('utf-8')
 	if True: # Only process the edgelists with the criteria here specified here
 		filepath = (PARAMS['DIRS'][1] + '/' + infile)
 		print('Processing: ' + infile)
 		# Specify tasks and specifications here:
-		Gs.append([g_prep(filepath, strict = False, gc = True, cd = True, polarization = True, n_checks = 100, n_influential = 8, n_sim = 1000,
-						  func_name = 'none', col1 = "#7828a0FF", col2 = "#fcae91FF"), infile[:len(infile)-16]])
+		Gs.append([g_prep(filepath, strict = False, func_name = 'none', 
+				  gc = True, cd = True, polarization = True, plot_layout = False, # Tasks 
+				  n_checks = 100, n_influential = 8, n_sim = 1000,                # RWC options
+				  col1 = "#7828a0FF", col2 = "#fcae91FF"),                        # Community labels
+			   infile[:len(infile)-16]])
+		
 		print('Done')
 
-# Gs[topic combo][0 (1 is name)][time period][0: graph; 1: [gc, node, edge]; 2: layout; 3: colours 4: rwc 5: aux]
-Gs_folder = "Gs_pickle_folder"
-try:
-	os.mkdir(Gs_folder)
-except FileExistsError:
-	pass
+# This is the structure of the nested list Gs:
+# Gs[topic combination][0][time period][0: graph object; 1: [giant component ratio, n_node, n_edge]; 2: fr-layout; 3: communities; 4: random-walk score; 5: aux info (safe to ignore)]
 
-updated_Gs = attaching_communities(Gs)
-pickle.dump(updated_Gs, open( "Gs_pickle_folder/Gs_pickle.p", "wb" ))
+# 4) Saving Gs as pickle output
+Gs_pickle_path = PARAMS['OUTPUT'][2] + '.pickle'
+with open(Gs_pickle_path.encode("utf-8"), 'wb') as out_pickle:
+	pickle.dump(Gs, out_pickle)
 
-# 3a) If need to check auxiliary information from community detection:
-#aux = []
-#for gs in Gs:
-#	for g in gs[0]:
-#		aux.append(g[5])
+# 5) Simple plotting
+# plot_filename = 'all_plots.pdf'
+# with PdfPages(plot_filename) as pdf:
+# 	for gs in Gs:
+# 		i = 0
+# 		for g in gs[0]:
+# 			i += 1
+# 			fig = plt.figure()
+# 			nx.draw(g[0],
+# 					pos = g[2],
+# 					node_size = 3,
+# 					width = 0.2,
+# 					node_color = g[3],
+# 					edge_color = "#333333FF"
+# 				   )
+# 			if isinstance(g[4], list):
+# 				rwc = statistics.median(g[4])
+# 			else:
+# 				rwc = g[4]
+# 			fig.suptitle(str(i) + ') ' + gs[1] + ' (RWC: ' + str(round(rwc, 3)) + ')' +
+# 						 '\n(Nodes: ' + str(g[1][1]) + ', Edges: ' + str(g[1][2]) + ' , Portion of Nodes Plotted: ' + str(round(g[1][0], 3)) + ')', fontsize = 10)
+# 			pdf.savefig()
+# 			plt.close()
 
-# 4) Simple plotting
-plot_filename = 'all_plots.pdf'
-with PdfPages(plot_filename) as pdf:
-	for gs in Gs:
-		i = 0
-		for g in gs[0]:
-			i += 1
-			fig = plt.figure()
-			nx.draw(g[0],
-					pos = g[2],
-					node_size = 3,
-					width = 0.2,
-					node_color = g[3],
-					edge_color = "#333333FF"
-				   )
-			if isinstance(g[4], list):
-				rwc = statistics.median(g[4])
-			else:
-				rwc = g[4]
-			fig.suptitle(str(i) + ') ' + gs[1] + ' (RWC: ' + str(round(rwc, 3)) + ')' +
-						 '\n(Nodes: ' + str(g[1][1]) + ', Edges: ' + str(g[1][2]) + ' , Portion of Nodes Plotted: ' + str(round(g[1][0], 3)) + ')', fontsize = 10)
-			pdf.savefig()
-			plt.close()
-
-# 5) Output a csv file with the following columns:
-# a) id, b) combination, c) period and interval, d) period id, e) text or hashtag, f) 1000 polarization scores, g) model
+# 6) Output a csv file with the following columns:
+# a) id, b) combination, c) period id, d) text or hashtag, e) n_nodes, f) n_edges, g) giant component ratio, f) 1000 polarization scores
 import csv
-csv_filename = 'network_statistics.csv'
+csv_filename = PARAMS['OUTPUT'][3] + '.csv'
 
 # Writing header
 header = ['gid', 'name', 'pid', 'type', 'n_nodes', 'n_edges', 'gcr']
