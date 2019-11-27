@@ -276,8 +276,9 @@ def randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_us
 				right_influencers.append(node[0])
 				count_right += 1
 	rwc = []
-	samp = random.choices(list(G.nodes()), k = n_checks)
 	for _ in range(n_sim):
+		samp = random.choices(list(G.nodes()), k = n_checks)
+		
 		left_left = 0
 		left_right = 0
 		right_right = 0
