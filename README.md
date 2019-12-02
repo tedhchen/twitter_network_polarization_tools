@@ -30,5 +30,5 @@ The networkx graph object `G` has two node attributes: 1) node id (which should 
 The output .csv file has the following columns:
 
 ```
-a) id; b) topic; c) period id; d) text or hashtag (by default networks are subset by text strings); e) number of nodes; f) number of edges; g) giant component ratio; f) 1000 random-walk scores
+a) id; b) topic; c) period id; d) text or hashtag (by default networks are subset by text strings); e) number of nodes; f) number of edges; g) giant component ratio; h) 1000 random-walk scores
 ```
