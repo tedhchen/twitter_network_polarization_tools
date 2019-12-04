@@ -23,7 +23,7 @@ Gs = []
 for infile in sorted(os.listdir(bytes(PARAMS['OUTPUT'][1], encoding='utf-8'))):
 	infile = infile.decode('utf-8')
 	if True: # Only process the edgelists with the criteria here specified here
-		filepath = (PARAMS['DIRS'][1] + '/' + infile)
+		filepath = (PARAMS['OUTPUT'][1] + '/' + infile)
 		print('Processing: ' + infile)
 		# Specify tasks and specifications here:
 		Gs.append([g_prep(filepath, strict = False, func_name = 'none', 
