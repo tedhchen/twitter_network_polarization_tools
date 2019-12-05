@@ -389,7 +389,6 @@ def g_prep(infile, strict, gc, cd, polarization, plot_layout, n_checks, n_influe
 	try:
 		for period in rt_list:
 			i += 1
-			print('\tPeriod ' + str(i) + '...')
 			G = nx.Graph()
 			G.add_edges_from(period)
 			if G.number_of_nodes() < 2:
