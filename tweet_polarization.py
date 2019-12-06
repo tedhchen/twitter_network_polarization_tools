@@ -6,6 +6,7 @@ import networkx as nx
 from collections import Counter
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+import math
 import random
 import statistics
 import nxmetis
@@ -259,7 +260,9 @@ def perform_randomwalk(G, starting_node, li, ri):
 ## n_influential: number of influential nodes from each side
 ## n_sim: number of times to let the n_checks nodes walk
 ## left_ and right_partition_users: lists of nodes belonging to each respective community
-def randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_users, right_partition_users):	
+def randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_users, right_partition_users):
+	n_influential_left = math.ceil(len(left_partition_users) * n_influential)
+	n_influential_right = math.ceil(len(right_partition_users) * n_influential)
 	dict_degree = {}
 	for node in G.nodes():
 		dict_degree[node] = G.degree(node)
@@ -268,11 +271,11 @@ def randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_us
 	count_left, count_right = 0, 0
 	for node in sorted_dict_degree:
 		if (node[0] in left_partition_users):
-			if (count_left < n_influential):
+			if (count_left < n_influential_left):
 				left_influencers.append(node[0])
 				count_left += 1
 		else:
-			if (count_right < n_influential):
+			if (count_right < n_influential_right):
 				right_influencers.append(node[0])
 				count_right += 1
 	rwc = []
