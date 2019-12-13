@@ -261,11 +261,22 @@ def perform_randomwalk(G, starting_node, li, ri):
 ## n_sim: number of times to let the n_checks nodes walk
 ## left_ and right_partition_users: lists of nodes belonging to each respective community
 def randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_users, right_partition_users):
+	# Number of nodes in each partition
+	n_left = len(left_partition_users)
+	n_right = len(right_partition_users)
+	# Number of influential nodes as function of each partition
 	n_influential_left = math.ceil(len(left_partition_users) * n_influential)
 	n_influential_right = math.ceil(len(right_partition_users) * n_influential)
+	# Going through all nodes to get degree and weights to balance sampling to 1:1
 	dict_degree = {}
+	ws = []
 	for node in G.nodes():
 		dict_degree[node] = G.degree(node)
+		if node in left_partition_users:
+			ws.append(n_right)
+		else:
+			ws.append(n_left)
+	# Finding all influential nodes
 	sorted_dict_degree = sorted(dict_degree.items(), key = lambda kv: kv[1], reverse = True)
 	left_influencers, right_influencers = [], []
 	count_left, count_right = 0, 0
@@ -278,9 +289,12 @@ def randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_us
 			if (count_right < n_influential_right):
 				right_influencers.append(node[0])
 				count_right += 1
+		if count_left == n_influential_left and count_right == n_influential_right:
+			break
+	# Starting random walks
 	rwc = []
 	for _ in range(n_sim):
-		samp = random.choices(list(G.nodes()), k = n_checks)
+		samp = random.choices(list(G.nodes()), k = n_checks, weights = ws)
 		
 		left_left = 0
 		left_right = 0
@@ -351,7 +365,10 @@ def comm_detect(G, col1, col2, func_name, polarization, n_checks, n_influential,
 	aux = comm[2]
 
 	if polarization == True:
-		rwc = randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_users = comm[0], right_partition_users = comm[1])
+		if len(comm[0]) == 0 or len(comm[1]) == 0:
+			rwc = 0
+		else:
+			rwc = randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_users = comm[0], right_partition_users = comm[1])
 	else:
 		rwc = 0
 
@@ -392,6 +409,7 @@ def g_prep(infile, strict, gc, cd, polarization, plot_layout, n_checks, n_influe
 	try:
 		for period in rt_list:
 			i += 1
+			print('\tPeriod ' + str(i) + '...')
 			G = nx.Graph()
 			G.add_edges_from(period)
 			if G.number_of_nodes() < 2:
