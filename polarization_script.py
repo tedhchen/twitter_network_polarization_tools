@@ -29,11 +29,12 @@ for infile in sorted(os.listdir(bytes(PARAMS['OUTPUT'][1], encoding = 'utf-8')))
 		filepath = (PARAMS['OUTPUT'][1] + '/' + infile)
 		# Specify tasks and specifications here:
 		Gs.append([g_prep(filepath, strict = False, func_name = 'none',
-				  gc = True, cd = True, polarization = True, plot_layout = False,
-				  n_checks = 1000, n_influential = 0.02, n_sim = 1000,
-				  col1 = "#7828a0FF", col2 = "#fcae91FF"),
-			   infile[:len(infile)-16]])
+						  gc = True, cd = True, polarization = True, plot_layout = False,
+						  n_checks = 1000, n_influential = 0.02, n_sim = 1000,
+						  col1 = "#7828a0FF", col2 = "#fcae91FF"),
+				   infile[:len(infile)-16]])
 		
+
 # This is the structure of the nested list Gs:
 # Gs[topic combination][0][time period][0: graph object; 1: [giant component ratio, n_node, n_edge]; 2: fr-layout; 3: communities; 4: random-walk score; 5: aux info (safe to ignore)]
 
@@ -43,28 +44,30 @@ with open(Gs_pickle_path.encode("utf-8"), 'wb') as out_pickle:
 	pickle.dump(Gs, out_pickle)
 
 # 5) Simple plotting
-# plot_filename = 'all_plots.pdf'
-# with PdfPages(plot_filename) as pdf:
-# 	for gs in Gs:
-# 		i = 0
-# 		for g in gs[0]:
-# 			i += 1
-# 			fig = plt.figure()
-# 			nx.draw(g[0],
-# 					pos = g[2],
-# 					node_size = 3,
-# 					width = 0.2,
-# 					node_color = g[3],
-# 					edge_color = "#333333FF"
-# 				   )
-# 			if isinstance(g[4], list):
-# 				rwc = statistics.median(g[4])
-# 			else:
-# 				rwc = g[4]
-# 			fig.suptitle(str(i) + ') ' + gs[1] + ' (RWC: ' + str(round(rwc, 3)) + ')' +
-# 						 '\n(Nodes: ' + str(g[1][1]) + ', Edges: ' + str(g[1][2]) + ' , Portion of Nodes Plotted: ' + str(round(g[1][0], 3)) + ')', fontsize = 10)
-# 			pdf.savefig()
-# 			plt.close()
+plot = False
+if plot == True:
+	plot_filename = 'all_plots.pdf'
+	with PdfPages(plot_filename) as pdf:
+		for gs in Gs:
+			i = 0
+			for g in gs[0]:
+				i += 1
+				fig = plt.figure()
+				nx.draw(g[0],
+					pos = g[2],
+					node_size = 3,
+					width = 0.2,
+					node_color = g[3],
+					edge_color = "#333333FF"
+				       )
+				if isinstance(g[4], list):
+					rwc = statistics.median(g[4])
+				else:
+					rwc = g[4]
+				fig.suptitle(str(i) + ') ' + gs[1] + ' (RWC: ' + str(round(rwc, 3)) + ')' + 
+					     '\n(Nodes: ' + str(g[1][1]) + ', Edges: ' + str(g[1][2]) + ' , Portion of Nodes Plotted: ' + str(round(g[1][0], 3)) + ')', fontsize = 10)
+				pdf.savefig()
+				plt.close()
 
 # 6) Output a csv file with the following columns:
 # a) id, b) combination, c) period id, d) text or hashtag, e) n_nodes, f) n_edges, g) giant component ratio, f) 1000 polarization scores
