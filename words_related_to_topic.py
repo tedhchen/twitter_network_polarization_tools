@@ -1,6 +1,6 @@
 import json
 import re
-#from uralicNLP import uralicApi
+from uralicNLP import uralicApi
 import itertools
 from collections import Counter
 import os
@@ -24,7 +24,7 @@ def remove_url(txt):
     text = re.sub(r"http\S+", "", txt)
     return text
 
-def process_text(tweets, sw):
+def process_text(tweets, sw, LEM):
 
     processed_tweets = []
 
@@ -42,7 +42,8 @@ def process_text(tweets, sw):
             tweet_3 = [w for w in tweet_2 if w not in sw]
             
             # Lemmatize
-            #tweet_4 = [uralicApi.lemmatize(w, "fin") for w in tweet_3]
+            if LEM:
+                tweet_3 = [uralicApi.lemmatize(w, "fin") for w in tweet_3]
             
             processed_tweets.append(tweet_3)
     
@@ -58,7 +59,8 @@ def process_text(tweets, sw):
             tweet_3 = [w for w in tweet_2 if w not in sw]
             
             #  Lemmatize
-            #tweet_4 = [uralicApi.lemmatize(w, "fin") for w in tweet_3]
+            if LEM:
+                tweet_3 = [uralicApi.lemmatize(w, "fin") for w in tweet_3]
         
             processed_tweets.append(tweet_3)
 
@@ -82,14 +84,17 @@ def main():
     data_dir = "/run/user/1282311/gvfs/smb-share:server=data.triton.aalto.fi,share=scratch/cs/networks/ecanet/elections/raw_tweets/all_data"
     
     # Select the word
-    seed_word = "ilmastonmuutos"
+    seed_word = "yle"
+
+    # Lemmatize
+    LEM = False
 
     ##########################################################################################################
 
     stopwords_fin = load_stopwords()
 
     files = [f for f in os.listdir(data_dir) if f.endswith('.json')]
-    #files = files[0:10]
+    files = files[0:4]
     f_count = len(files)
     freq_dict_all = dict()
     selected_structs = []
@@ -99,8 +104,10 @@ def main():
         with open(os.path.join(data_dir, f), "r") as read_file:
             data = json.load(read_file)
 
-        all_tweets_processed = process_text(data, stopwords_fin)
-
+        all_tweets_processed = process_text(data, stopwords_fin, LEM)
+        #print(all_tweets_processed)
+        if LEM:
+            all_tweets_processed = flatten(all_tweets_processed)
         freq_dict_batch = word_frequency(all_tweets_processed)
         freq_dict_all = Counter(freq_dict_all) + Counter(freq_dict_batch)
 
@@ -124,6 +131,7 @@ def main():
 
     # Flatten the struct list
     flattened_structs = [item for sublist in selected_structs for item in sublist]
+    #print(flattened_structs)
     struct_counts = list(Counter(flattened_structs).items())
     #print(struct_counts)
     # Normalized occurences
@@ -141,7 +149,7 @@ def main():
     
     #print(sorted_dict)
 
-    with open('cooccurence_result.json', 'w', encoding='utf8') as fp:
+    with open('cooccurence_result_try.json', 'w', encoding='utf8') as fp:
         json.dump(sorted_dict, fp, ensure_ascii=False)
     
 
