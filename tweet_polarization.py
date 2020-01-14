@@ -10,6 +10,7 @@ import math
 import random
 import statistics
 import nxmetis
+from scipy import stats
 
 #--------------------#
 # Defining functions #
@@ -336,6 +337,61 @@ def randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_us
 		rwc.append(pll*prr - plr*prl)
 	return(rwc)
 
+# Documentation coming soon
+
+def kernel_density_estimation(cut, rest):
+
+    kernel_for_cut = stats.gaussian_kde(cut, bw_method=1e-3)
+    kernel_for_rest = stats.gaussian_kde(rest, bw_method=1e-3)
+    
+    cut_sample = kernel_for_cut.resample(size=10000)
+    rest_sample = kernel_for_rest.resample(size=10000)
+
+    epsilon = 0.0001
+    cut_sample = [val + epsilon for val in cut_sample[0]]
+    rest_sample = [val + epsilon for val in rest_sample[0]]
+    
+    return cut_sample, rest_sample
+
+def BCC_score(G, n_sim, left_partition_users, right_partition_users):
+    
+    dict_edgebetweenness = nx.edge_betweenness_centrality(G)
+    print("Edge betweenness scores computed. The simulations begin.")
+    BCC_scores = []
+
+    for _ in range(n_sim):
+
+        dict_ebs = dict_edgebetweenness.copy()
+        cut_ebs, rest_ebs = [], []
+        keys_to_remove = []
+        
+        for n1 in left_partition_users:
+            for n2 in right_partition_users:
+                
+                if G.has_edge(n1, n2):
+                    
+                    if ((n1, n2) in dict_ebs):
+                        cut_ebs.append(dict_ebs[(n1, n2)])
+                        keys_to_remove.append((n1, n2))
+
+                    else:
+                        cut_ebs.append(dict_ebs[(n2, n1)])
+                        keys_to_remove.append((n2, n1))
+                                    
+        for k in keys_to_remove:
+            dict_ebs.pop(k)
+        
+        rest_ebs = list(dict_ebs.values())
+
+        cut_dist_kde, rest_dist_kde = kernel_density_estimation(cut_ebs, rest_ebs)
+
+        kl_divergence = stats.entropy(cut_dist_kde, rest_dist_kde)
+        BCC = 1-2.71828**(-kl_divergence)
+        
+        BCC_scores.append(BCC)
+
+    return BCC_scores
+
 # (6) comm_detect() and g_prep() are high level wrappers to perform the partitioning and polarization estimation procedures
 
 # Community Detection Wrapper
@@ -364,13 +420,20 @@ def comm_detect(G, col1, col2, func_name, polarization, n_checks, n_influential,
 	comm = metis_partition(G)
 	aux = comm[2]
 
-	if polarization == True:
+	if polarization == 1:
 		if len(comm[0]) == 0 or len(comm[1]) == 0:
-			rwc = 0
+			pol_score = 0
 		else:
-			rwc = randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_users = comm[0], right_partition_users = comm[1])
+			pol_score = randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_users = comm[0], right_partition_users = comm[1])
+	
+	elif polarization == 2:
+		if len(comm[0]) == 0 or len(comm[1]) == 0:
+			pol_score = 0
+		else:
+			pol_score = BCC_score(G, n_sim, left_partition_users = comm[0], right_partition_users = comm[1])
+	
 	else:
-		rwc = 0
+		pol_score = 0
 
 	cols = []
 	for node in list(G.nodes):
@@ -380,7 +443,7 @@ def comm_detect(G, col1, col2, func_name, polarization, n_checks, n_influential,
 			cols.append(col2)
 		else:
 			cols.append('#696969')
-	return cols, rwc, aux
+	return cols, pol_score, aux
 
 
 # High level wrapper to process the pickle edgelists. Has specification to include/omit various subtasks.
