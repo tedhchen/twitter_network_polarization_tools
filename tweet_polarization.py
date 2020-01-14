@@ -353,7 +353,7 @@ def kernel_density_estimation(cut, rest):
     
     return cut_sample, rest_sample
 
-def BCC_score(G, n_sim, left_partition_users, right_partition_users):
+def bcc_score(G, n_sim, left_partition_users, right_partition_users):
     
     dict_edgebetweenness = nx.edge_betweenness_centrality(G)
     print("Edge betweenness scores computed. The simulations begin.")
@@ -430,7 +430,7 @@ def comm_detect(G, col1, col2, func_name, polarization, n_checks, n_influential,
 		if len(comm[0]) == 0 or len(comm[1]) == 0:
 			pol_score = 0
 		else:
-			pol_score = BCC_score(G, n_sim, left_partition_users = comm[0], right_partition_users = comm[1])
+			pol_score = bcc_score(G, n_sim, left_partition_users = comm[0], right_partition_users = comm[1])
 	
 	else:
 		pol_score = 0
