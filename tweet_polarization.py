@@ -207,6 +207,14 @@ def get_giant_component(G):
 	giant_component_ratio = GC.number_of_nodes()/G.number_of_nodes()
 	return GC, giant_component_ratio
 
+# Takes networkx graph (G) and converts it to graphtool graph (GT). Only considers undirected edges without further information.
+def simple_nx2gt(G):
+	GT = gt.Graph(directed = False)
+	es = list(G.edges())
+	for e in es:
+		GT.add_edge(e[0], e[1])
+	return GT
+
 # (4) Community detection algorithms. All these take networkx graph objects G.
 # Add additional community detection algorithms:
 # Input is always networkx graph object G, so add package converter in the beginning of the function if needed;
@@ -226,6 +234,31 @@ def metis_partition(G):
 
 	return(comm)
 
+# SBM (strict 2)
+def sbm_strict2(G):
+	GT = simplenx2gt(G)
+	dc = True
+	curr_model = gt.minimize_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = True)
+	curr_desclen = curr_model.entropy()
+	for _ in range(9):
+		sbm = gt.minimize_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = True)
+		if sbm.entropy() < curr_desclen:
+			curr_model = sbm
+			curr_desclen = sbm.entropy()
+	for _ in range(10):
+		sbm = gt.minimize_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = False)
+		if sbm.entropy() < curr_desclen:
+			dc = False
+			curr_model = sbm
+			curr_desclen = sbm.entropy()
+	comm = curr_model.get_blocks()
+	comm1, comm2 = [], []
+	for v in GT.vertices():
+		if comm[v] == 0:
+			comm1.append(GT.vertex_index[v])
+		if comm[v] == 1:
+			comm2.append(GT.vertex_index[v])
+	return([comm1, comm2, dc])
 
 # (5) perform_randomwalk() and randomwalk_polarization() are used to estimate the random walk controversy for networks built from the pickle edgelists above.
 
@@ -261,7 +294,9 @@ def perform_randomwalk(G, starting_node, li, ri):
 ## n_influential: number of influential nodes from each side
 ## n_sim: number of times to let the n_checks nodes walk
 ## left_ and right_partition_users: lists of nodes belonging to each respective community
-def randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_users, right_partition_users):
+def randomwalk_polarization(G, n_sim, left_partition_users, right_partition_users, n_checks = 'default', n_influential = 0.02):
+	if n_checks == 'default':
+		n_checks = G.size()
 	# Number of nodes in each partition
 	n_left = len(left_partition_users)
 	n_right = len(right_partition_users)
@@ -337,7 +372,7 @@ def randomwalk_polarization(G, n_checks, n_influential, n_sim, left_partition_us
 		rwc.append(pll*prr - plr*prl)
 	return(rwc)
 
-# Documentation coming soon
+# Betweenness centrality controversy (Documentation coming soon)
 
 def kernel_density_estimation(cut, rest):
 
@@ -356,7 +391,7 @@ def kernel_density_estimation(cut, rest):
 def bcc_score(G, n_sim, left_partition_users, right_partition_users):
     
     dict_edgebetweenness = nx.edge_betweenness_centrality(G)
-    print("Edge betweenness scores computed. The simulations begin.")
+    #print("Edge betweenness scores computed. The simulations begin.")
     BCC_scores = []
 
     for _ in range(n_sim):
@@ -391,6 +426,19 @@ def bcc_score(G, n_sim, left_partition_users, right_partition_users):
         BCC_scores.append(BCC)
 
     return BCC_scores
+
+# EI index (actually an "IE" index because it is internal - external instead of the other way around in the original formulation)
+def ei_ind(G, n_sim, left_partition_users, right_partition_users):
+	il, el = 0, 0
+	for e in G.edges():
+		one = e[0] in left_partition_users
+		two = e[1] in left_partition_users
+		if one == two:
+			il += 1
+		else:
+			el += 1
+	ei = (il - el)/(il + el)
+	return ei
 
 # (6) comm_detect() and g_prep() are high level wrappers to perform the partitioning and polarization estimation procedures
 
@@ -543,35 +591,6 @@ def g_prep(infile, strict, gc, cd, polarization, plot_layout, n_checks, n_influe
 # 			comm2.append(GT.vertex_index[v])
 # 	return([comm1, comm2, dc])
 
-# # SBM (strict 2)
-# def sbm_strict_comm2(G):
-# 	GT = gt.Graph(directed = False)
-# 	es = list(G.edges())
-# 	for e in es:
-# 		GT.add_edge(e[0], e[1])
-# 	dc = True
-# 	curr_model = gt.minimize_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = True)
-# 	curr_desclen = curr_model.entropy()
-# 	for _ in range(9):
-# 		sbm = gt.minimize_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = True)
-# 		if sbm.entropy() < curr_desclen:
-# 			curr_model = sbm
-# 			curr_desclen = sbm.entropy()
-# 	for _ in range(10):
-# 		sbm = gt.minimize_blockmodel_dl(GT, B_min = 2, B_max = 2, deg_corr = False)
-# 		if sbm.entropy() < curr_desclen:
-# 			dc = False
-# 			curr_model = sbm
-# 			curr_desclen = sbm.entropy()
-# 	comm = curr_model.get_blocks()
-# 	comm1, comm2 = [], []
-# 	for v in GT.vertices():
-# 		if comm[v] == 0:
-# 			comm1.append(GT.vertex_index[v])
-# 		if comm[v] == 1:
-# 			comm2.append(GT.vertex_index[v])
-# 	return([comm1, comm2, dc])
-
 # # SBM-nested (1-2)
 # def sbm_nested_lax_comm2(G):
 # 	GT = gt.Graph(directed = False)
@@ -692,13 +711,6 @@ def g_prep(infile, strict, gc, cd, polarization, plot_layout, n_checks, n_influe
 # 	comm = algorithms.em(G, k = 2).communities
 # 	return(comm)
 
-# Takes networkx graph (G) and converts it to graphtool graph (GT). Only considers undirected edges without further information.
-# def simple_nx2gt(G):
-# 	GT = gt.Graph(directed = False)
-# 	es = list(G.edges())
-# 	for e in es:
-# 		GT.add_edge(e[0], e[1])
-# 	return GT
 
 # Take community information and add it as a node attribute to networkx graph object.
 # def attaching_communities(Gs_infos):
