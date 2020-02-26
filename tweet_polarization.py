@@ -3,6 +3,7 @@
 #---------------------------#
 import os, json, ast, pickle
 import networkx as nx
+import graph_tool.all as gt
 from collections import Counter
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
