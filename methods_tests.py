@@ -47,12 +47,17 @@ def to_cmnets(G, n_sims):
 		cm.append(G)
 	return cm
 
-#
+# Running the analysis
 Gs = inpickle('top100_hashtag_graphs.pickle')
+Gs = inpickle('garimella_20_graphs.pickle')
 
+# Get giant component
 GCs = [get_giant_component(G)[0] for G in Gs]
 
+# Get communities
 comms = comm_detect(GCs, func = 'metis')
 
-pol_scores2 = get_score(GCs, comms, func = 'ei', n_sim = 100)
+# Get polarization score
+pol_scores = get_score(GCs, comms, func = 'rwc', n_sim = 1)
+
 
