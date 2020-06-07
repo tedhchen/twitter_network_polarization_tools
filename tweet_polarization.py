@@ -90,6 +90,43 @@ def hashtag_overlap(tweet, set1, set2, all_text, outfolder):
 								with open(outpath.encode("utf-8"), 'a', encoding = 'utf-8') as outfile:
 									outfile.write(str((tweet['timestamp'], tweet['user']['id'], tweet['retweeted_status']['user']['id'], rt_stat)) + '\n')
 
+# Simple Parser
+def simple_parser(tweet, set1, check_fi, outfolder):
+	hts_a = set1[0].split(',')
+	outpath = outfolder + '/has_' + hts_a[0] + '.txt'
+	check_fi = set(check_fi)
+	if 'retweeted_status' in tweet:
+		hts = [x.lower() for x in tweet['retweeted_status']['hashtags']]
+		if len(hts) > 0:
+			hts_set = set(hts)
+			if len(hts_set.intersection(set(hts_a))) > 0:
+				if len(set(hts_a) & hts_set) > len(set(hts_a) & check_fi & hts_set): 
+					with open(outpath.encode("utf-8"), 'a', encoding = 'utf-8') as outfile:
+						outfile.write(str((tweet['timestamp'], tweet['user']['id'], tweet['retweeted_status']['user']['id'])) + '\n')
+				else:
+					if tweet['retweeted_status']['lang'] == 'fi':
+						with open(outpath.encode("utf-8"), 'a', encoding = 'utf-8') as outfile:
+							outfile.write(str((tweet['timestamp'], tweet['user']['id'], tweet['retweeted_status']['user']['id'])) + '\n')
+
+# Run Simple Parser
+def run_simple_parser(set1, raw, check_fi, outfolder):
+	try:
+		os.mkdir(outfolder)
+	except FileExistsError:
+		pass
+	# Cycles through tweets
+	files = sorted(os.listdir(raw))
+	for file in files:
+		file_name = file[0:10]
+		try:
+			os.mkdir(outfolder + '/' + file_name)
+		except FileExistsError:
+			pass
+		with open(os.path.join(raw, file), 'r', encoding = 'utf-8') as read_file:
+			data = json.load(read_file)
+			for tweet in data:
+				simple_parser(tweet, set1, check_fi, outfolder + '/' + file_name)
+
 # Wrapper for the hashtag_overlap() function:
 # Arguments:
 ## raw: where the raw tweet jsons are stored
@@ -207,6 +244,27 @@ def get_giant_component(G):
 	GC = G.subgraph(gc)
 	giant_component_ratio = GC.number_of_nodes()/G.number_of_nodes()
 	return GC, giant_component_ratio
+
+# Directly returns a network from parsed tweets
+def to_simple_network(set1, start, period_size, infolder):
+	files = sorted(os.listdir(infolder))
+	start_i = [index for index, item in enumerate(files) if item == start][0]
+	rts_set = []
+	for a in set1:
+		rts = []
+		hts_a = a.split(',')
+		infiles = [infolder + '/' + files[j] + '/has_' + hts_a[0] + '.txt' for j in range(start_i, start_i + period_size)]
+		for infile in infiles:
+			try:
+				with open(infile.encode('utf-8'), 'r', encoding = 'utf-8') as f:
+					for line in f:
+						rt = ast.literal_eval(line)
+						rts.append(tuple(sorted(rt[1:3])))
+			except FileNotFoundError:
+				pass
+		rts = list(set(rts))
+		rts_set.append(rts)
+	return rts_set
 
 # Takes networkx graph (G) and converts it to graphtool graph (GT). Only considers undirected edges without further information.
 def simple_nx2gt(G):
