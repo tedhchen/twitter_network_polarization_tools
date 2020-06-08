@@ -13,12 +13,24 @@ with open('params.txt', encoding = 'utf-8') as params:
 
 # Running script
 # 1) Parsing raw data
-print('Start parsing raw data.')
-run_parser(set1 = PARAMS['SET1'], set2 = PARAMS['SET2'], all_text = True, raw = PARAMS['TWEET_FOLDER'][0], outfolder = PARAMS['OUTPUT'][0])
+# print('Start parsing raw data.')
+# run_parser(set1 = PARAMS['SET1'], set2 = PARAMS['SET2'], all_text = True, raw = PARAMS['TWEET_FOLDER'][0], outfolder = PARAMS['OUTPUT'][0])
+for topic in PARAMS['TOPICS']:
+	run_simple_parser(set1 = PARAMS['HP_' + topic], check_fi = PARAMS['HP_notfi'], raw = PARAMS['TWEET_FOLDER'][0], outfolder = PARAMS['OUTPUT'][0])
 
 # 2) Create edgelists
-print('Start creating edgelists.')
-to_links(set1 = PARAMS['SET1'], set2 = PARAMS['SET2'], infolder = PARAMS['OUTPUT'][0], outfolder = PARAMS['OUTPUT'][1], period_size = PARAMS['TIME'][0], period_interval = PARAMS['TIME'][1])
+# print('Start creating edgelists.')
+# to_links(set1 = PARAMS['SET1'], set2 = PARAMS['SET2'], infolder = PARAMS['OUTPUT'][0], outfolder = PARAMS['OUTPUT'][1], period_size = PARAMS['TIME'][0], period_interval = PARAMS['TIME'][1])
+period1 = to_simple_network(PARAMS['TOPICS'], start = '2019-03-01', period_size = 45, infolder = PARAMS['OUTPUT'][0])
+period2 = to_simple_network(PARAMS['TOPICS'], start = '2019-04-15', period_size = 42, infolder = PARAMS['OUTPUT'][0])
+period3 = to_simple_network(PARAMS['TOPICS'], start = '2019-05-27', period_size = 66, infolder = PARAMS['OUTPUT'][0])
+
+els = [period1, period2, period3]
+
+for period in range(0,3):
+	for topic in range(len(PARAMS['TOPICS'])):
+		with open('output/edgelists/period' + str(period + 1) + '/' + PARAMS['TOPICS'][topic] + '_edgelist.pickle', 'wb') as out_pickle:
+			pickle.dump(els[period][topic], out_pickle)
 
 # 3) Working with edgelist data
 print('Start graph partitioning.')
