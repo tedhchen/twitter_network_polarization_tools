@@ -3,7 +3,7 @@
 #---------------------------#
 import os, json, ast, pickle
 import networkx as nx
-import graph_tool.all as gt
+#import graph_tool.all as gt
 from collections import Counter
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
@@ -281,10 +281,10 @@ def simple_nx2gt(G):
 # Specifically: [[Ids for comm1], [Ids for comm2], auxiliary information]
 
 # Metis
-def metis_partition(G):
+def metis_partition(G, seed, contig = True, ufactor = 280, ncuts = 1, niter = 100, pfactor = 0):
 	
 	# For further details on metis-parameters, please refer to the manual
-	settings = nxmetis.MetisOptions(ncuts=4, niter=200, ufactor=280)
+	settings = nxmetis.MetisOptions(seed = seed, contig = contig, ncuts = ncuts, niter = niter, pfactor = pfactor, ufactor = ufactor)
 	par = nxmetis.partition(G, 2, options=settings)
 	the_edge_cut = par[0]
 	community1 = par[1][0]
