@@ -266,6 +266,25 @@ def to_simple_network(set1, start, period_size, infolder):
 		rts_set.append(rts)
 	return rts_set
 
+def to_directed_network(set1, start, period_size, infolder):
+	files = sorted(os.listdir(infolder))
+	start_i = [index for index, item in enumerate(files) if item == start][0]
+	rts_set = []
+	for a in set1:
+		rts = []
+		hts_a = a.split(',')
+		infiles = [infolder + '/' + files[j] + '/has_' + hts_a[0] + '.txt' for j in range(start_i, start_i + period_size)]
+		for infile in infiles:
+			try:
+				with open(infile.encode('utf-8'), 'r', encoding = 'utf-8') as f:
+					for line in f:
+						rt = ast.literal_eval(line)
+						rts.append(tuple([rt[1], rt[2], rt[0]]))
+			except FileNotFoundError:
+				pass
+		rts_set.append(rts)
+	return rts_set
+
 # Takes networkx graph (G) and converts it to graphtool graph (GT). Only considers undirected edges without further information.
 def simple_nx2gt(G):
 	GT = gt.Graph(directed = False)
